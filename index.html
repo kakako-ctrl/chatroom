@@ -5,15 +5,385 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HackerChat v3.0 - Real-Time</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
 </head>
 <body>
-    <!-- Same HTML structure as before -->
-    <!-- ... -->
-    
-    <script src="script.js"></script>
+    <div class="terminal">
+        <div class="header">
+            <span class="logo">HACKERCHAT v3.0 [GLOBAL MODE]</span>
+            <div class="auth-buttons">
+                <button id="login-btn">LOGIN</button>
+                <button id="signup-btn">SIGN UP</button>
+                <button id="logout-btn" style="display:none;">LOGOUT</button>
+            </div>
+        </div>
+        
+        <div id="auth-forms" class="hidden">
+            <!-- Login/Signup forms will appear here -->
+        </div>
+        
+        <div id="chat-container" class="hidden">
+            <div class="sidebar">
+                <div class="user-info">
+                    <span id="username-display">user@hackerchat:~$</span>
+                    <span id="user-role"></span>
+                </div>
+                <div id="admin-controls" class="hidden">
+                    <h3>ADMIN CONTROLS</h3>
+                    <button id="create-channel-btn">+ NEW CHANNEL</button>
+                </div>
+                <div class="online-users">
+                    <h3>ACTIVE USERS</h3>
+                    <ul id="user-list">
+                        <!-- Users will appear here -->
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="chat-area">
+                <div id="chat-messages">
+                    <!-- Messages will appear here -->
+                    <div class="system-message">System: Connected to global chat. Messages display in real-time.</div>
+                </div>
+                <div class="message-input">
+                    <input type="text" id="message-input" placeholder="Type your message here..." autocomplete="off">
+                    <button id="send-btn">SEND</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase v9+ Modular Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-app.js";
+        import { getDatabase, ref, set, push, onValue, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
+
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+        const firebaseConfig = {
+        apiKey: "AIzaSyAx61vSdOHcyGg8QMymppEQw-DQG4n5tGw",
+        authDomain: "chatroom-5d86e.firebaseapp.com",
+        projectId: "chatroom-5d86e",
+        storageBucket: "chatroom-5d86e.firebasestorage.app",
+        messagingSenderId: "543243760445",
+        appId: "1:543243760445:web:dd71f9fafedfc420b8cb54",
+        measurementId: "G-232VMM77V3"
+                                   };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const auth = getAuth(app);
+
+        // Admin credentials
+        const ADMIN_CREDENTIALS = {
+            email: "root@hackerchat.com",
+            password: "toor123"
+        };
+
+        // Main application state
+        const state = {
+            currentUser: null,
+            isAdmin: false,
+            messages: [],
+            activeUsers: []
+        };
+
+        // DOM Elements
+        const elements = {
+            loginBtn: document.getElementById('login-btn'),
+            signupBtn: document.getElementById('signup-btn'),
+            logoutBtn: document.getElementById('logout-btn'),
+            authForms: document.getElementById('auth-forms'),
+            chatContainer: document.getElementById('chat-container'),
+            usernameDisplay: document.getElementById('username-display'),
+            userRole: document.getElementById('user-role'),
+            adminControls: document.getElementById('admin-controls'),
+            createChannelBtn: document.getElementById('create-channel-btn'),
+            userList: document.getElementById('user-list'),
+            chatMessages: document.getElementById('chat-messages'),
+            messageInput: document.getElementById('message-input'),
+            sendBtn: document.getElementById('send-btn')
+        };
+
+        // Initialize the app
+        function init() {
+            setupEventListeners();
+            
+            // Check auth state
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    handleSuccessfulLogin(user.email.replace(/@.*$/, ""));
+                } else {
+                    updateUI();
+                }
+            });
+        }
+
+        function setupEventListeners() {
+            // Auth buttons
+            elements.loginBtn.addEventListener('click', showLoginForm);
+            elements.signupBtn.addEventListener('click', showSignupForm);
+            elements.logoutBtn.addEventListener('click', logout);
+            
+            // Chat functionality
+            elements.sendBtn.addEventListener('click', sendMessage);
+            elements.messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+            
+            // Admin functionality
+            elements.createChannelBtn.addEventListener('click', createChannel);
+        }
+
+        // Auth functions
+        function showLoginForm() {
+            elements.authForms.innerHTML = `
+                <div class="auth-form">
+                    <h2>LOGIN</h2>
+                    <input type="text" id="login-email" placeholder="Username or Email" autocomplete="off">
+                    <input type="password" id="login-password" placeholder="Password" autocomplete="off">
+                    <button id="submit-login">ACCESS SYSTEM</button>
+                    <div id="login-error" style="color: #f00; margin-top: 10px;"></div>
+                </div>
+            `;
+            
+            document.getElementById('submit-login').addEventListener('click', () => {
+                const email = document.getElementById('login-email').value.trim();
+                const password = document.getElementById('login-password').value;
+                
+                // Check for admin login
+                if (email === "root" || email === ADMIN_CREDENTIALS.email) {
+                    if (password === ADMIN_CREDENTIALS.password) {
+                        signInWithEmailAndPassword(auth, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password)
+                            .catch(error => {
+                                document.getElementById('login-error').textContent = error.message;
+                            });
+                        return;
+                    }
+                }
+                
+                // Regular user login
+                const emailToUse = email.includes('@') ? email : `${email}@hackerchat.com`;
+                signInWithEmailAndPassword(auth, emailToUse, password)
+                    .catch(error => {
+                        document.getElementById('login-error').textContent = error.message;
+                    });
+            });
+        }
+
+        function showSignupForm() {
+            elements.authForms.innerHTML = `
+                <div class="auth-form">
+                    <h2>SIGN UP</h2>
+                    <input type="text" id="signup-username" placeholder="Username" autocomplete="off">
+                    <input type="password" id="signup-password" placeholder="Password" autocomplete="off">
+                    <input type="password" id="signup-confirm" placeholder="Confirm Password" autocomplete="off">
+                    <button id="submit-signup">CREATE ACCOUNT</button>
+                    <div id="signup-error" style="color: #f00; margin-top: 10px;"></div>
+                </div>
+            `;
+            
+            document.getElementById('submit-signup').addEventListener('click', () => {
+                const username = document.getElementById('signup-username').value.trim();
+                const password = document.getElementById('signup-password').value;
+                const confirm = document.getElementById('signup-confirm').value;
+                const errorDiv = document.getElementById('signup-error');
+                
+                if (!username || !password) {
+                    errorDiv.textContent = 'Username and password are required';
+                    return;
+                }
+                
+                if (password !== confirm) {
+                    errorDiv.textContent = 'Passwords do not match';
+                    return;
+                }
+                
+                if (username.toLowerCase() === "root") {
+                    errorDiv.textContent = 'Username "root" is reserved';
+                    return;
+                }
+                
+                createUserWithEmailAndPassword(auth, `${username}@hackerchat.com`, password)
+                    .then(() => {
+                        // Add user to database
+                        set(ref(database, 'users/' + username), {
+                            username: username,
+                            isAdmin: false,
+                            createdAt: serverTimestamp()
+                        });
+                    })
+                    .catch(error => {
+                        errorDiv.textContent = error.message;
+                    });
+            });
+        }
+
+        function handleSuccessfulLogin(username) {
+            state.currentUser = username;
+            state.isAdmin = (username === "root");
+            
+            // Update presence
+            const userStatusRef = ref(database, 'status/' + username);
+            const connectedRef = ref(database, '.info/connected');
+            
+            onValue(connectedRef, (snapshot) => {
+                if (snapshot.val() === false) return;
+                
+                onDisconnect(userStatusRef).set({
+                    online: false,
+                    lastChanged: serverTimestamp()
+                }).then(() => {
+                    set(userStatusRef, {
+                        online: true,
+                        lastChanged: serverTimestamp()
+                    });
+                });
+            });
+            
+            // Load messages and setup listeners
+            setupRealTimeListeners();
+            updateUI();
+        }
+
+        function setupRealTimeListeners() {
+            // Messages listener
+            onValue(ref(database, 'messages'), (snapshot) => {
+                state.messages = [];
+                snapshot.forEach((childSnapshot) => {
+                    state.messages.push(childSnapshot.val());
+                });
+                updateChatDisplay();
+            });
+            
+            // Active users listener
+            onValue(ref(database, 'status'), (snapshot) => {
+                state.activeUsers = [];
+                snapshot.forEach((childSnapshot) => {
+                    const userStatus = childSnapshot.val();
+                    if (userStatus.online) {
+                        onValue(ref(database, 'users/' + childSnapshot.key), (userSnapshot) => {
+                            const userData = userSnapshot.val();
+                            state.activeUsers.push({
+                                username: childSnapshot.key,
+                                isAdmin: userData ? userData.isAdmin : false
+                            });
+                            updateActiveUsersList();
+                        });
+                    }
+                });
+            });
+        }
+
+        function logout() {
+            signOut(auth).then(() => {
+                state.currentUser = null;
+                state.isAdmin = false;
+                updateUI();
+            });
+        }
+
+        function sendMessage() {
+            if (!state.currentUser) return;
+            
+            const messageText = elements.messageInput.value.trim();
+            if (!messageText) return;
+            
+            push(ref(database, 'messages'), {
+                username: state.currentUser,
+                text: messageText,
+                timestamp: serverTimestamp(),
+                isAdmin: state.isAdmin
+            });
+            
+            elements.messageInput.value = '';
+        }
+
+        function createChannel() {
+            if (!state.isAdmin) return;
+            
+            const channelName = prompt("Enter new channel name (e.g., #secret):");
+            if (!channelName) return;
+            
+            set(ref(database, 'channels/' + channelName.replace('#', '')), {
+                name: channelName,
+                createdBy: state.currentUser,
+                createdAt: serverTimestamp()
+            }).then(() => {
+                alert(`Channel "${channelName}" created!`);
+            });
+        }
+
+        function updateUI() {
+            if (state.currentUser) {
+                elements.authForms.classList.add('hidden');
+                elements.chatContainer.classList.remove('hidden');
+                elements.loginBtn.style.display = 'none';
+                elements.signupBtn.style.display = 'none';
+                elements.logoutBtn.style.display = 'block';
+                elements.usernameDisplay.textContent = `${state.currentUser}@hackerchat:~$`;
+                elements.userRole.textContent = state.isAdmin ? '[ADMIN]' : '';
+                
+                if (state.isAdmin) {
+                    elements.adminControls.classList.remove('hidden');
+                } else {
+                    elements.adminControls.classList.add('hidden');
+                }
+            } else {
+                elements.authForms.classList.remove('hidden');
+                elements.chatContainer.classList.add('hidden');
+                elements.loginBtn.style.display = 'block';
+                elements.signupBtn.style.display = 'block';
+                elements.logoutBtn.style.display = 'none';
+            }
+            
+            updateChatDisplay();
+            updateActiveUsersList();
+        }
+
+        function updateChatDisplay() {
+            elements.chatMessages.innerHTML = '';
+            
+            // Add system message
+            const systemMsg = document.createElement('div');
+            systemMsg.className = 'system-message';
+            systemMsg.textContent = `System: Connected to global chat. Messages display in real-time.`;
+            elements.chatMessages.appendChild(systemMsg);
+            
+            // Add messages to chat
+            state.messages.sort((a, b) => a.timestamp - b.timestamp).forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'message';
+                
+                const timestamp = new Date(msg.timestamp).toLocaleTimeString();
+                const usernameClass = msg.isAdmin ? 'username admin' : 'username';
+                
+                msgDiv.innerHTML = `
+                    <span class="${usernameClass}">${msg.username}${msg.isAdmin ? ' [ADMIN]' : ''}</span>
+                    <span class="timestamp">${timestamp}</span>: ${msg.text}
+                `;
+                
+                elements.chatMessages.appendChild(msgDiv);
+            });
+            
+            elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+        }
+
+        function updateActiveUsersList() {
+            elements.userList.innerHTML = '';
+            
+            state.activeUsers.forEach(user => {
+                const li = document.createElement('li');
+                li.textContent = user.username;
+                if (user.isAdmin) {
+                    li.classList.add('admin');
+                }
+                elements.userList.appendChild(li);
+            });
+        }
+
+        // Initialize the app
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
 </body>
 </html>
