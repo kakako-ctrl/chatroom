@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HackerChat v1.0</title>
+    <title>HackerChat v2.0 - Global Room</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="terminal">
         <div class="header">
-            <span class="logo">AnonymousChat v1.0</span>
+            <span class="logo">HACKERCHAT v2.0 [GLOBAL MODE]</span>
             <div class="auth-buttons">
                 <button id="login-btn">LOGIN</button>
                 <button id="signup-btn">SIGN UP</button>
@@ -25,15 +25,17 @@
             <div class="sidebar">
                 <div class="user-info">
                     <span id="username-display">user@hackerchat:~$</span>
+                    <span id="user-role"></span>
                 </div>
-                <div class="groups">
-                    <h3>GROUP CHANNELS</h3>
-                    <ul id="group-list">
-                        <li class="active">#general</li>
-                        <li>#code-sharing</li>
-                        <li>#off-topic</li>
+                <div id="admin-controls" class="hidden">
+                    <h3>ADMIN CONTROLS</h3>
+                    <button id="create-channel-btn">+ NEW CHANNEL</button>
+                </div>
+                <div class="online-users">
+                    <h3>ACTIVE USERS</h3>
+                    <ul id="user-list">
+                        <!-- Users will appear here -->
                     </ul>
-                    <button id="create-group-btn">+ CREATE GROUP</button>
                 </div>
             </div>
             
@@ -43,7 +45,7 @@
                     <div class="system-message">System: Chat history resets every 24 hours. Last reset: <span id="last-reset"></span></div>
                 </div>
                 <div class="message-input">
-                    <input type="text" id="message-input" placeholder="Type your message here...">
+                    <input type="text" id="message-input" placeholder="Type your message here..." autocomplete="off">
                     <button id="send-btn">SEND</button>
                 </div>
             </div>
