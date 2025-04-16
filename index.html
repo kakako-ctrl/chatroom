@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackerChat v1.0</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="terminal">
+        <div class="header">
+            <span class="logo">AnonymousChat v1.0</span>
+            <div class="auth-buttons">
+                <button id="login-btn">LOGIN</button>
+                <button id="signup-btn">SIGN UP</button>
+                <button id="logout-btn" style="display:none;">LOGOUT</button>
+            </div>
+        </div>
+        
+        <div id="auth-forms" class="hidden">
+            <!-- Login/Signup forms will appear here -->
+        </div>
+        
+        <div id="chat-container" class="hidden">
+            <div class="sidebar">
+                <div class="user-info">
+                    <span id="username-display">user@hackerchat:~$</span>
+                </div>
+                <div class="groups">
+                    <h3>GROUP CHANNELS</h3>
+                    <ul id="group-list">
+                        <li class="active">#general</li>
+                        <li>#code-sharing</li>
+                        <li>#off-topic</li>
+                    </ul>
+                    <button id="create-group-btn">+ CREATE GROUP</button>
+                </div>
+            </div>
+            
+            <div class="chat-area">
+                <div id="chat-messages">
+                    <!-- Messages will appear here -->
+                    <div class="system-message">System: Chat history resets every 24 hours. Last reset: <span id="last-reset"></span></div>
+                </div>
+                <div class="message-input">
+                    <input type="text" id="message-input" placeholder="Type your message here...">
+                    <button id="send-btn">SEND</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
