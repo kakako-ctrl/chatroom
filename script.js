@@ -1,11 +1,16 @@
 // Main application state
 const state = {
     currentUser: null,
-    currentGroup: '#general',
+    isAdmin: false,
     messages: [],
     lastReset: new Date(),
-    users: {},
-    groups: ['#general', '#code-sharing', '#off-topic']
+    users: {
+        // Default admin account
+        "admin": { password: "admin123", isAdmin: true },
+        // Sample regular user
+        "user": { password: "user123", isAdmin: false }
+    },
+    activeUsers: []
 };
 
 // DOM Elements
@@ -16,11 +21,13 @@ const elements = {
     authForms: document.getElementById('auth-forms'),
     chatContainer: document.getElementById('chat-container'),
     usernameDisplay: document.getElementById('username-display'),
-    groupList: document.getElementById('group-list'),
+    userRole: document.getElementById('user-role'),
+    adminControls: document.getElementById('admin-controls'),
+    createChannelBtn: document.getElementById('create-channel-btn'),
+    userList: document.getElementById('user-list'),
     chatMessages: document.getElementById('chat-messages'),
     messageInput: document.getElementById('message-input'),
     sendBtn: document.getElementById('send-btn'),
-    createGroupBtn: document.getElementById('create-group-btn'),
     lastReset: document.getElementById('last-reset')
 };
 
@@ -37,6 +44,9 @@ function init() {
     
     // Update UI based on current state
     updateUI();
+    
+    // Simulate active users (in a real app, this would come from a server)
+    simulateActiveUsers();
 }
 
 function loadData() {
@@ -44,7 +54,6 @@ function loadData() {
     const savedUsers = localStorage.getItem('hackerChatUsers');
     const savedMessages = localStorage.getItem('hackerChatMessages');
     const savedReset = localStorage.getItem('hackerChatLastReset');
-    const savedGroups = localStorage.getItem('hackerChatGroups');
     
     if (savedUsers) {
         state.users = JSON.parse(savedUsers);
@@ -58,14 +67,12 @@ function loadData() {
         state.lastReset = new Date(savedReset);
     }
     
-    if (savedGroups) {
-        state.groups = JSON.parse(savedGroups);
-    }
-    
     // Check if user is already logged in
     const loggedInUser = localStorage.getItem('hackerChatCurrentUser');
     if (loggedInUser && state.users[loggedInUser]) {
         state.currentUser = loggedInUser;
+        state.isAdmin = state.users[loggedInUser].isAdmin || false;
+        addActiveUser(loggedInUser, state.isAdmin);
     }
 }
 
@@ -73,7 +80,6 @@ function saveData() {
     localStorage.setItem('hackerChatUsers', JSON.stringify(state.users));
     localStorage.setItem('hackerChatMessages', JSON.stringify(state.messages));
     localStorage.setItem('hackerChatLastReset', state.lastReset.toISOString());
-    localStorage.setItem('hackerChatGroups', JSON.stringify(state.groups));
     
     if (state.currentUser) {
         localStorage.setItem('hackerChatCurrentUser', state.currentUser);
@@ -116,25 +122,8 @@ function setupEventListeners() {
         }
     });
     
-    // Group functionality
-    elements.createGroupBtn.addEventListener('click', createGroup);
-    
-    // Group selection
-    elements.groupList.addEventListener('click', (e) => {
-        if (e.target.tagName === 'LI') {
-            // Remove active class from all groups
-            document.querySelectorAll('#group-list li').forEach(li => {
-                li.classList.remove('active');
-            });
-            
-            // Add active class to clicked group
-            e.target.classList.add('active');
-            
-            // Update current group
-            state.currentGroup = e.target.textContent;
-            updateChatDisplay();
-        }
-    });
+    // Admin functionality
+    elements.createChannelBtn.addEventListener('click', createChannel);
 }
 
 function updateUI() {
@@ -148,6 +137,14 @@ function updateUI() {
         
         // Update username display
         elements.usernameDisplay.textContent = `${state.currentUser}@hackerchat:~$`;
+        elements.userRole.textContent = state.isAdmin ? '[ADMIN]' : '';
+        
+        // Show admin controls if user is admin
+        if (state.isAdmin) {
+            elements.adminControls.classList.remove('hidden');
+        } else {
+            elements.adminControls.classList.add('hidden');
+        }
     } else {
         elements.authForms.classList.remove('hidden');
         elements.chatContainer.classList.add('hidden');
@@ -159,23 +156,11 @@ function updateUI() {
     // Update last reset time display
     elements.lastReset.textContent = state.lastReset.toLocaleString();
     
-    // Update group list
-    updateGroupList();
-    
     // Update chat display
     updateChatDisplay();
-}
-
-function updateGroupList() {
-    elements.groupList.innerHTML = '';
-    state.groups.forEach(group => {
-        const li = document.createElement('li');
-        li.textContent = group;
-        if (group === state.currentGroup) {
-            li.classList.add('active');
-        }
-        elements.groupList.appendChild(li);
-    });
+    
+    // Update active users list
+    updateActiveUsersList();
 }
 
 function updateChatDisplay() {
@@ -187,11 +172,8 @@ function updateChatDisplay() {
     systemMsg.textContent = `System: Chat history resets every 24 hours. Last reset: ${state.lastReset.toLocaleString()}`;
     elements.chatMessages.appendChild(systemMsg);
     
-    // Filter messages for current group
-    const groupMessages = state.messages.filter(msg => msg.group === state.currentGroup);
-    
     // Add messages to chat
-    groupMessages.forEach(msg => {
+    state.messages.forEach(msg => {
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message';
         
@@ -200,8 +182,9 @@ function updateChatDisplay() {
             msgDiv.textContent = msg.text;
         } else {
             const timestamp = new Date(msg.timestamp).toLocaleTimeString();
+            const usernameClass = msg.isAdmin ? 'username admin' : 'username';
             msgDiv.innerHTML = `
-                <span class="username">${msg.username}</span>
+                <span class="${usernameClass}">${msg.username}${msg.isAdmin ? ' [ADMIN]' : ''}</span>
                 <span class="timestamp">${timestamp}</span>: ${msg.text}
             `;
         }
@@ -218,8 +201,8 @@ function showLoginForm() {
     elements.authForms.innerHTML = `
         <div class="auth-form">
             <h2>LOGIN</h2>
-            <input type="text" id="login-username" placeholder="Username">
-            <input type="password" id="login-password" placeholder="Password">
+            <input type="text" id="login-username" placeholder="Username" autocomplete="off">
+            <input type="password" id="login-password" placeholder="Password" autocomplete="off">
             <button id="submit-login">ACCESS SYSTEM</button>
             <div id="login-error" style="color: #f00; margin-top: 10px;"></div>
         </div>
@@ -232,9 +215,9 @@ function showSignupForm() {
     elements.authForms.innerHTML = `
         <div class="auth-form">
             <h2>SIGN UP</h2>
-            <input type="text" id="signup-username" placeholder="Username">
-            <input type="password" id="signup-password" placeholder="Password">
-            <input type="password" id="signup-confirm" placeholder="Confirm Password">
+            <input type="text" id="signup-username" placeholder="Username" autocomplete="off">
+            <input type="password" id="signup-password" placeholder="Password" autocomplete="off">
+            <input type="password" id="signup-confirm" placeholder="Confirm Password" autocomplete="off">
             <button id="submit-signup">CREATE ACCOUNT</button>
             <div id="signup-error" style="color: #f00; margin-top: 10px;"></div>
         </div>
@@ -266,6 +249,8 @@ function login() {
     
     // Login successful
     state.currentUser = username;
+    state.isAdmin = state.users[username].isAdmin || false;
+    addActiveUser(username, state.isAdmin);
     saveData();
     updateUI();
 }
@@ -292,14 +277,18 @@ function signup() {
     }
     
     // In a real app, you would hash the password before storing it
-    state.users[username] = { password };
+    state.users[username] = { password, isAdmin: false };
     state.currentUser = username;
+    state.isAdmin = false;
+    addActiveUser(username, false);
     saveData();
     updateUI();
 }
 
 function logout() {
+    removeActiveUser(state.currentUser);
     state.currentUser = null;
+    state.isAdmin = false;
     saveData();
     updateUI();
 }
@@ -315,7 +304,7 @@ function sendMessage() {
         username: state.currentUser,
         text: messageText,
         timestamp: new Date().toISOString(),
-        group: state.currentGroup
+        isAdmin: state.isAdmin
     };
     
     state.messages.push(newMessage);
@@ -326,26 +315,62 @@ function sendMessage() {
     elements.messageInput.value = '';
 }
 
-// Group functions
-function createGroup() {
-    if (!state.currentUser) return;
+// Admin functions
+function createChannel() {
+    if (!state.isAdmin) return;
     
-    const groupName = prompt('Enter new group name (start with #):');
-    if (!groupName) return;
+    const channelName = prompt("Enter new channel name (e.g., #secret):");
+    if (!channelName) return;
     
-    if (!groupName.startsWith('#')) {
-        alert('Group names must start with #');
-        return;
+    // In a real implementation, this would create a new channel
+    alert(`Admin: Channel "${channelName}" created! (Note: This demo only has one global chat)`);
+}
+
+// Active users functions
+function addActiveUser(username, isAdmin) {
+    // Remove if already exists
+    removeActiveUser(username);
+    
+    state.activeUsers.push({ username, isAdmin });
+    updateActiveUsersList();
+}
+
+function removeActiveUser(username) {
+    state.activeUsers = state.activeUsers.filter(user => user.username !== username);
+    updateActiveUsersList();
+}
+
+function updateActiveUsersList() {
+    elements.userList.innerHTML = '';
+    
+    state.activeUsers.forEach(user => {
+        const li = document.createElement('li');
+        li.textContent = user.username;
+        if (user.isAdmin) {
+            li.classList.add('admin');
+        }
+        elements.userList.appendChild(li);
+    });
+}
+
+// Simulate some active users (for demo purposes)
+function simulateActiveUsers() {
+    if (state.currentUser) {
+        // Add some fake users to make it look active
+        const demoUsers = [
+            { username: "hacker42", isAdmin: false },
+            { username: "cyberghost", isAdmin: false },
+            { username: "root", isAdmin: true }
+        ];
+        
+        demoUsers.forEach(user => {
+            if (user.username !== state.currentUser) {
+                state.activeUsers.push(user);
+            }
+        });
+        
+        updateActiveUsersList();
     }
-    
-    if (state.groups.includes(groupName)) {
-        alert('Group already exists');
-        return;
-    }
-    
-    state.groups.push(groupName);
-    saveData();
-    updateGroupList();
 }
 
 // Initialize the app when the page loads
