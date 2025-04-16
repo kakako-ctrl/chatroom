@@ -53,7 +53,7 @@ button:hover {
 }
 
 .sidebar {
-    width: 250px;
+    width: 200px;
     border-right: 1px solid #333;
     padding: 10px;
     display: flex;
@@ -66,28 +66,53 @@ button:hover {
     margin-bottom: 10px;
 }
 
-.groups {
-    flex-grow: 1;
+#user-role {
+    color: #ff0;
+    font-size: 0.8em;
+    display: block;
+    margin-top: 5px;
 }
 
-.groups h3 {
+#admin-controls {
+    margin-top: 20px;
+    padding: 10px 0;
+    border-top: 1px dashed #333;
+    border-bottom: 1px dashed #333;
+}
+
+#admin-controls h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+#admin-controls button {
+    width: 100%;
+    padding: 8px;
+    margin-top: 5px;
+}
+
+.online-users {
+    margin-top: 20px;
+}
+
+.online-users h3 {
     margin-top: 0;
     border-bottom: 1px solid #333;
     padding-bottom: 5px;
 }
 
-#group-list {
+#user-list {
     list-style: none;
     padding: 0;
 }
 
-#group-list li {
+#user-list li {
     padding: 5px;
-    cursor: pointer;
+    color: #0f0;
 }
 
-#group-list li:hover, #group-list li.active {
-    background-color: #111;
+#user-list li.admin {
+    color: #ff0;
 }
 
 .chat-area {
@@ -110,6 +135,10 @@ button:hover {
 .message .username {
     font-weight: bold;
     color: #0f0;
+}
+
+.message .username.admin {
+    color: #ff0;
 }
 
 .message .timestamp {
